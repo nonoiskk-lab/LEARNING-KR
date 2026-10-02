@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { LimitError } from "./services/learning";
+import { TeacherBusyError } from "./ai/gemini";
 
 export function json<T>(data: T, init?: number | ResponseInit) {
   return NextResponse.json(data, typeof init === "number" ? { status: init } : init);
@@ -7,6 +8,7 @@ export function json<T>(data: T, init?: number | ResponseInit) {
 
 export function errorResponse(err: unknown) {
   if (err instanceof LimitError) return json({ error: "limit", kind: err.kind, upgrade: err.upgrade }, 402);
+  if (err instanceof TeacherBusyError) return json({ error: err.message }, 503);
   console.error(err);
   const message = err instanceof Error ? err.message : "Something went wrong";
   return json({ error: message }, 400);

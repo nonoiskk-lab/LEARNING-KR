@@ -57,6 +57,7 @@ AI voice/avatar is the main variable cost. Rough per-turn estimate with the defa
 |---|---|---|
 | Claude Opus 5.5 | ≈ $0.018 | ≈ $0.36 |
 | Claude Sonnet 5.5 (`TEACHER_MODEL=claude-sonnet-5-5`) | ≈ $0.008 | ≈ $0.16 |
+| Google Gemini free tier (`TEACHER_PROVIDER=gemini`) | $0 within the free quota | $0 — fine for demos and small tests, not for real traffic |
 | Neural TTS (ElevenLabs, ~180 chars) | ≈ $0.03 | ≈ $0.60 |
 | Streaming photoreal avatar (~11 s) | ≈ $0.03–0.05 | ≈ $0.60–1.00 |
 | Browser STT/TTS + built-in portrait | $0 | $0 |

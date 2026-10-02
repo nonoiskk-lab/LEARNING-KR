@@ -27,7 +27,7 @@ interface Props {
   sceneBackground: string;
   sceneName: string;
   prefs: { nativeLanguage: string; voiceSpeed: number; voiceStyle: string; voiceConsent: boolean };
-  aiMode: "claude" | "demo";
+  aiMode: "claude" | "gemini" | "demo";
 }
 
 const SPEEDS = [0.75, 1, 1.25, 1.5];
@@ -390,7 +390,7 @@ export default function SessionClient(p: Props) {
           <div className="card rise w-full max-w-md p-6">
             <h2 id="consent-title" className="font-display text-xl">Can Maya listen?</h2>
             <p className="mt-2 text-sm text-muted">
-              To practise speaking, your voice is converted to text by your browser&apos;s speech service. We store the text of the conversation to track your progress — never your raw audio. You can delete your data anytime in Profile → Privacy.
+              To practise speaking, your voice is converted to text by your browser&apos;s speech service. The text of the conversation is sent to our AI provider to create Maya's replies, and we store it to track your progress — never your raw audio. You can delete your data anytime in Profile → Privacy.
             </p>
             <div className="mt-5 flex gap-3">
               <button className="btn btn-primary flex-1" onClick={grantConsent}>Allow & start speaking</button>

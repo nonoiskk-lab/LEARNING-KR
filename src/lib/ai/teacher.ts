@@ -3,6 +3,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { TEACHER_SYSTEM, learnerContext, type LearnerContextInput } from "./prompt";
 import { TeacherTurnSchema, type TeacherTurn } from "./schema";
 import { mockTeacherTurn } from "./mock";
+import { geminiTeacherTurn } from "./gemini";
 
 export interface HistoryItem {
   role: "user" | "teacher";
@@ -21,7 +22,7 @@ export interface TeacherResult {
   turn: TeacherTurn;
   usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
   costMicroUsd: number;
-  provider: "claude" | "demo";
+  provider: TeacherProvider;
   model: string;
 }
 
@@ -37,10 +38,27 @@ const PRICE_PER_MTOK: Record<string, { input: number; output: number; cacheRead:
   "claude-haiku-4-5": { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
 };
 
-let client: Anthropic | null = null;
-export function aiEnabled(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+export type TeacherProvider = "claude" | "gemini" | "demo";
+
+/**
+ * TEACHER_PROVIDER picks the brain explicitly; otherwise the first configured
+ * key wins (Claude, then Gemini), and with no key the offline demo tutor runs.
+ */
+export function teacherProvider(): TeacherProvider {
+  const hasClaude = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY);
+  const wanted = process.env.TEACHER_PROVIDER?.toLowerCase();
+  if (wanted === "demo") return "demo";
+  if (wanted === "gemini") return hasGemini ? "gemini" : "demo";
+  if (wanted === "claude") return hasClaude ? "claude" : "demo";
+  return hasClaude ? "claude" : hasGemini ? "gemini" : "demo";
 }
+
+export function aiEnabled(): boolean {
+  return teacherProvider() !== "demo";
+}
+
+let client: Anthropic | null = null;
 
 function getClient(): Anthropic {
   client ??= new Anthropic({ timeout: 45_000, maxRetries: 2 });
@@ -51,6 +69,15 @@ export function costMicroUsd(model: string, u: TeacherResult["usage"]): number {
   const p = PRICE_PER_MTOK[model] ?? PRICE_PER_MTOK["claude-opus-5-5"];
   // price per MTok == micro-USD per token
   return Math.round(u.inputTokens * p.input + u.outputTokens * p.output + u.cacheReadTokens * p.cacheRead + u.cacheWriteTokens * p.cacheWrite);
+}
+
+/** Tell the model how the message arrived, so it can ignore speech-recognition noise. */
+function annotatedLearnerMessage(req: TeacherRequest): string {
+  const meta =
+    req.inputMode === "speak"
+      ? `[spoken via speech recognition${typeof req.sttConfidence === "number" ? `, recogniser confidence ${req.sttConfidence.toFixed(2)}` : ""}]`
+      : "[typed]";
+  return `${meta} ${req.learnerMessage}`;
 }
 
 function buildMessages(req: TeacherRequest): Anthropic.Beta.BetaMessageParam[] {
@@ -64,11 +91,7 @@ function buildMessages(req: TeacherRequest): Anthropic.Beta.BetaMessageParam[] {
     if (last && last.role === role && typeof last.content === "string") last.content += `\n${h.text}`;
     else msgs.push({ role, content: h.text });
   }
-  const meta =
-    req.inputMode === "speak"
-      ? `[spoken via speech recognition${typeof req.sttConfidence === "number" ? `, recogniser confidence ${req.sttConfidence.toFixed(2)}` : ""}]`
-      : "[typed]";
-  const learner = `${meta} ${req.learnerMessage}`;
+  const learner = annotatedLearnerMessage(req);
   const last = msgs[msgs.length - 1];
   if (last && last.role === "user" && typeof last.content === "string") last.content += `\n${learner}`;
   else msgs.push({ role: "user", content: learner });
@@ -76,7 +99,14 @@ function buildMessages(req: TeacherRequest): Anthropic.Beta.BetaMessageParam[] {
 }
 
 export async function teacherTurn(req: TeacherRequest): Promise<TeacherResult> {
-  if (!aiEnabled()) {
+  const provider = teacherProvider();
+  if (provider === "gemini") {
+    const r = await geminiTeacherTurn(req, annotatedLearnerMessage(req));
+    // Output that doesn't match the schema: keep the conversation going instead of failing the turn.
+    const turn = r.turn ?? { ...mockTeacherTurn(req), reply: "Sorry, could you say that once more in a different way?", corrections: [] };
+    return { turn, usage: r.usage, costMicroUsd: r.costMicroUsd, provider: "gemini", model: r.model };
+  }
+  if (provider === "demo") {
     return {
       turn: mockTeacherTurn(req),
       usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
