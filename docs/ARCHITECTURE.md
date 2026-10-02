@@ -81,6 +81,7 @@ Prisma schema: `prisma/schema.prisma`.
 - **Prompt caching:** the persona/rules block (`TEACHER_SYSTEM`) is identical for every learner and carries `cache_control`, so it is billed at cache-read rates. Learner context (level, native language, difficulty, focus mistakes, scenario) follows it.
 - **History window:** last 16 messages verbatim; long-term context lives in skills and mistake memory instead of an ever-growing transcript.
 - **Safety & robustness:** server-side refusal fallbacks (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`); if the final `stop_reason` is still `refusal` or output can't be parsed, the conversation continues gracefully. Maya always discloses she is an AI.
+- **Gemini alternative** (`src/lib/ai/gemini.ts`, `TEACHER_PROVIDER=gemini`): same persona prompt and the same `TeacherTurnSchema`, sent as `responseJsonSchema` with low thinking level; the reply is validated with Zod and the conversation continues gracefully if it doesn't match. Free-tier rate-limit errors (429) become a friendly "try again in a minute" message. Note the free tier's low request quotas and Google's data-use terms for unpaid usage before putting real learners on it.
 - **Correction policy (in the prompt):** react to content first; at most one correction spoken, ≤3 recorded; ignore STT noise; always end with exactly one question; never feel like an exam.
 
 ## 5. Voice pipeline

@@ -5,7 +5,7 @@ import { currentUser } from "@/lib/auth";
 import { MODES, SCENES, getMode } from "@/lib/config/modes";
 import { getScenario } from "@/lib/config/scenarios";
 import { effectivePlan, hasFeature } from "@/lib/billing/entitlements";
-import { aiEnabled } from "@/lib/ai/teacher";
+import { teacherProvider } from "@/lib/ai/teacher";
 
 export const metadata = { title: "Practice" };
 
@@ -54,7 +54,7 @@ export default async function Practice({ searchParams }: { searchParams: Promise
       sceneBackground={scene.background}
       sceneName={scene.name}
       prefs={{ nativeLanguage: user.nativeLanguage, voiceSpeed: user.voiceSpeed, voiceStyle: user.voiceStyle, voiceConsent: Boolean(user.voiceConsentAt) }}
-      aiMode={aiEnabled() ? "claude" : "demo"}
+      aiMode={teacherProvider()}
     />
   );
 }

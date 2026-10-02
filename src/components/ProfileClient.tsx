@@ -120,7 +120,7 @@ export default function ProfileClient({ user, plan, languages, isAdmin }: Props)
       <section className="card space-y-3 p-6 md:col-span-2" aria-labelledby="privacy">
         <h2 id="privacy" className="font-semibold">Privacy & data</h2>
         <p className="text-sm text-muted">
-          Maya is an AI teacher. Speech is transcribed by your browser&apos;s speech service; we keep the text of your conversations to personalise lessons and never store raw audio. You control your data.
+          Maya is an AI teacher. Speech is transcribed by your browser&apos;s speech service. Conversation text is sent to our AI provider to generate Maya&apos;s replies, and we keep it to personalise lessons. We never store raw audio. You control your data.
         </p>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.voiceConsent} onChange={(e) => save({ voiceConsent: e.target.checked })} />

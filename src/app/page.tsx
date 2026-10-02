@@ -117,7 +117,7 @@ export default function Landing() {
         {[
           ["Is Maya a real person?", "No. Maya is an AI teacher, and we always say so. She's designed to be patient, encouraging and available whenever you want to practise."],
           ["Do I need to be good at English already?", "Not at all. Beginners can start with simple sentences and use their own language as a bridge. Maya adapts to your level automatically."],
-          ["What happens to my voice?", "Your browser converts speech to text. We store the text to track your progress — not your audio — and you can download or delete your data any time."],
+          ["What happens to my voice?", "Your browser converts speech to text. The text is sent to our AI provider to create Maya's replies and stored to track your progress — never your audio — and you can download or delete your data any time."],
           ["Can I use it on my phone?", "Yes — Fluentia is designed mobile-first with one-hand controls and a big microphone button."],
         ].map(([q, a]) => (
           <details key={q} className="border-b border-line py-4">

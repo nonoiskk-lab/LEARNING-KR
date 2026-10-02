@@ -34,6 +34,7 @@ npm run dev                   # http://localhost:3000
 Optional:
 
 - `ANTHROPIC_API_KEY=...` → the real Claude teacher (default model `claude-opus-5-5`, set `TEACHER_MODEL` to change).
+- `GEMINI_API_KEY=...` → Google Gemini as the teacher instead (free tier available at [aistudio.google.com](https://aistudio.google.com); default model `gemini-3.8-flash`, set `GEMINI_MODEL` to change). If both keys are set, pick one with `TEACHER_PROVIDER=claude|gemini`.
 - `TTS_PROVIDER=elevenlabs` + `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID` → premium neural voice.
 - `STRIPE_*` keys and price IDs → real subscriptions (webhook: `/api/billing/webhook`).
 - `npm run db:seed` → 120 demo learners for the admin dashboard; log in as `admin@example.com` / `supersecret1` and open `/admin`.
