@@ -1,0 +1,197 @@
+// Fluentia data model.
+// Dev uses SQLite; production switches `provider` to "postgresql" (see docs/ARCHITECTURE.md §3).
+// String columns stand in for enums so the schema runs unchanged on both engines;
+// allowed values are enforced in src/lib/config/*.
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String?   @unique
+  passwordHash     String?
+  name             String?
+  isGuest          Boolean   @default(true)
+  role             String    @default("learner") // learner | admin
+  nativeLanguage   String    @default("hi")
+  selfReportedLevel String?  // beginner | elementary | intermediate | upper_intermediate | advanced | unsure
+  cefrLevel        String    @default("A2")      // A1..C2, maintained by the learning engine
+  goals            String    @default("[]")      // JSON array of goal ids
+  voiceConsentAt   DateTime?
+  voiceStyle       String    @default("warm")
+  voiceSpeed       Float     @default(1.0)
+  textSize         String    @default("md")
+  onboardedAt      DateTime?
+  acquisitionSource String?  // utm_source / referrer for CAC attribution
+  xp               Int       @default(0)
+  streakDays       Int       @default(0)
+  lastActiveDay    String?   // YYYY-MM-DD in user's timezone
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  subscription  Subscription?
+  skills        SkillScore[]
+  sessions      LearningSession[]
+  mistakes      MistakePattern[]
+  vocabulary    VocabularyItem[]
+  achievements  UserAchievement[]
+  usage         UsageDay[]
+  events        AnalyticsEvent[]
+}
+
+model Subscription {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan               String    @default("free")   // free | premium | pro | team
+  interval           String?                       // month | year
+  status             String    @default("active") // active | trialing | past_due | canceled
+  stripeCustomerId   String?   @unique
+  stripeSubscriptionId String? @unique
+  mrrCents           Int       @default(0)         // normalised monthly revenue, for BI
+  trialEndsAt        DateTime?
+  currentPeriodEnd   DateTime?
+  canceledAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+/// Rolling skill estimate per dimension (speaking, grammar, vocabulary, pronunciation, fluency, confidence, listening).
+model SkillScore {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill     String
+  score     Float    @default(40)
+  samples   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, skill])
+}
+
+model LearningSession {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode           String    // free | daily | business | interview | travel | daily_life | pronunciation | vocabulary | roleplay | assessment
+  scenarioId     String?
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  speakingSeconds Int      @default(0)
+  wordsSpoken    Int       @default(0)
+  turns          Int       @default(0)
+  xpEarned       Int       @default(0)
+  summary        String?   // JSON: end-of-session recap
+  messages       Message[]
+
+  @@index([userId, startedAt])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  sessionId   String
+  session     LearningSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role        String   // user | teacher
+  inputMode   String?  // speak | type
+  text        String
+  corrections String?  // JSON array of Correction
+  emotion     String?  // avatar reaction
+  score       Float?   // turn score (learner messages), drives adaptive difficulty
+  createdAt   DateTime @default(now())
+}
+
+/// Personal mistake memory: one row per recurring error pattern (e.g. "for_vs_since").
+model MistakePattern {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String
+  category    String   // grammar | vocabulary | pronunciation | structure | naturalness | word_choice | fluency
+  label       String
+  example     String   // last thing the learner said
+  better      String   // the corrected form
+  count       Int      @default(1)
+  mastered    Boolean  @default(false)
+  // spaced-repetition scheduling
+  ease        Float    @default(2.5)
+  intervalDays Int     @default(1)
+  dueAt       DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([userId, dueAt])
+}
+
+model VocabularyItem {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word       String
+  meaning    String?
+  example    String?
+  timesUsed  Int      @default(0)
+  dueAt      DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, word])
+}
+
+model UserAchievement {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement String
+  unlockedAt  DateTime @default(now())
+
+  @@unique([userId, achievement])
+}
+
+/// Daily metering for plan limits and AI cost accounting.
+model UsageDay {
+  id                 String @id @default(cuid())
+  userId             String
+  user               User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day                String // YYYY-MM-DD
+  conversations      Int    @default(0)
+  teacherTurns       Int    @default(0)
+  avatarSeconds      Int    @default(0)
+  speakingSeconds    Int    @default(0)
+  roleplays          Int    @default(0)
+  pronunciationDrills Int   @default(0)
+  llmInputTokens     Int    @default(0)
+  llmOutputTokens    Int    @default(0)
+  ttsChars           Int    @default(0)
+  sttSeconds         Int    @default(0)
+  costMicroUsd       Int    @default(0) // 1e-6 USD
+
+  @@unique([userId, day])
+  @@index([day])
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name      String   // signup | onboarding_complete | session_start | upgrade_prompt_shown | checkout_started | subscribed | churned ...
+  props     String?  // JSON
+  createdAt DateTime @default(now())
+
+  @@index([name, createdAt])
+}
+
+/// Marketing spend per channel per month, entered by admins, for CAC.
+model MarketingSpend {
+  id        String   @id @default(cuid())
+  month     String   // YYYY-MM
+  channel   String
+  cents     Int
+  createdAt DateTime @default(now())
+
+  @@unique([month, channel])
+}
